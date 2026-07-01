@@ -1,12 +1,14 @@
-﻿{
+{
   "name": "hitboxed-site",
   "version": "1.0.0",
   "scripts": {
     "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "discord.js": "^14.26.4",
     "express": "^4.21.0"
   }
 }
-
