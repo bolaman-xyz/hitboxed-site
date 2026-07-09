@@ -344,13 +344,7 @@
             <div class="hint">Pick which purchased product this guide appears under.</div>
         </div>
 
-        <div class="section-label" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-            <span>Steps</span>
-            <div style="display:flex;gap:6px;align-items:center;">
-                <select id="templatePicker" onchange="applyTemplate(this.value)" style="width:auto;padding:6px 8px;font-size:11px;"></select>
-                <button class="btn btn-sm btn-outline" type="button" onclick="saveAsTemplate()" style="font-size:11px;padding:5px 10px;">ðŸ’¾ Save as Template</button>
-            </div>
-        </div>
+        <div class="section-label">Steps</div>
         <div id="stepsContainer"></div>
         <button class="btn btn-sm btn-outline" type="button" onclick="addStep()" style="margin-top:8px;">+ Add Step</button>
 
@@ -589,7 +583,6 @@ function openGuideModal() {
     document.getElementById('guideTitle').value = '';
     document.getElementById('guideSubtitle').value = '';
     fillProductDropdown('');
-    fillTemplatePicker();
     document.getElementById('stepsContainer').innerHTML = '';
     addStep();
     document.getElementById('guideModal').classList.add('show');
@@ -602,73 +595,10 @@ function editGuide(slug) {
     document.getElementById('guideTitle').value = g.title || '';
     document.getElementById('guideSubtitle').value = g.subtitle || '';
     fillProductDropdown(g.productId || '');
-    fillTemplatePicker();
     const c = document.getElementById('stepsContainer');
     c.innerHTML = '';
     (g.steps && g.steps.length ? g.steps : [{}]).forEach(s => addStep(s));
     document.getElementById('guideModal').classList.add('show');
-}
-
-// ---- Templates ----
-function fillTemplatePicker() {
-    const sel = document.getElementById('templatePicker');
-    const tpls = config.templates || {};
-    const keys = Object.keys(tpls).filter(k => tpls[k] && typeof tpls[k] === 'object');
-    let html = '<option value="">Apply templateâ€¦</option>';
-    html += '<option value="__asx">âš¡ ASX (built-in)</option>';
-    keys.forEach(k => { html += `<option value="${k}">${esc(tpls[k].name || k)}</option>`; });
-    if (keys.length) html += '<option value="__del">ðŸ—‘ Delete a templateâ€¦</option>';
-    sel.innerHTML = html;
-    sel.value = '';
-}
-
-function applyTemplate(val) {
-    const sel = document.getElementById('templatePicker');
-    if (!val) return;
-    if (val === '__asx') { loadAsxTemplate(); sel.value = ''; return; }
-    if (val === '__del') { deleteTemplatePrompt(); sel.value = ''; return; }
-    const t = (config.templates || {})[val];
-    sel.value = '';
-    if (!t) return;
-    if (!document.getElementById('guideSubtitle').value.trim() && t.subtitle) document.getElementById('guideSubtitle').value = t.subtitle;
-    document.getElementById('stepsContainer').innerHTML = '';
-    (t.steps && t.steps.length ? t.steps : [{}]).forEach(s => addStep(s));
-    toast('Template applied');
-}
-
-async function saveAsTemplate() {
-    const steps = readSteps();
-    if (!steps.length) { toast('Add a step first'); return; }
-    const name = prompt('Name this template (e.g. "External Setup"):');
-    if (!name || !name.trim()) return;
-    const cleanName = name.trim();
-    const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || ('tpl-' + Date.now());
-    const body = { name: cleanName, subtitle: document.getElementById('guideSubtitle').value.trim(), steps };
-    await fetch('/api/admin/template/' + slug, {
-        method: 'PUT', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-    });
-    if (!config.templates) config.templates = {};
-    config.templates[slug] = body;
-    fillTemplatePicker();
-    toast('Saved template "' + cleanName + '"');
-}
-
-async function deleteTemplatePrompt() {
-    const tpls = config.templates || {};
-    const keys = Object.keys(tpls).filter(k => tpls[k] && typeof tpls[k] === 'object');
-    if (!keys.length) return;
-    const list = keys.map((k, i) => (i + 1) + '. ' + (tpls[k].name || k)).join('\n');
-    const pick = prompt('Type the number of the template to delete:\n\n' + list);
-    if (!pick) return;
-    const idx = parseInt(pick.trim(), 10) - 1;
-    if (isNaN(idx) || idx < 0 || idx >= keys.length) { toast('Invalid choice'); return; }
-    const slug = keys[idx];
-    const nm = tpls[slug].name || slug;
-    await fetch('/api/admin/template/' + slug, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
-    delete config.templates[slug];
-    fillTemplatePicker();
-    toast('Deleted template "' + nm + '"');
 }
 
 async function saveGuide() {
@@ -716,85 +646,6 @@ async function deleteGuide() {
     toast('Guide deleted');
     await loadAdminData();
 }
-
-function loadAsxTemplate() {
-    if (!document.getElementById('guideTitle').value.trim()) document.getElementById('guideTitle').value = 'Fortnite Ext Guide';
-    if (!document.getElementById('guideSubtitle').value.trim()) document.getElementById('guideSubtitle').value = 'Complete setup for ASX External â€” follow every step before your first launch.';
-    document.getElementById('stepsContainer').innerHTML = '';
-    ASX_TEMPLATE.forEach(s => addStep(s));
-    toast('Template loaded â€” edit then Save');
-}
-
-const ASX_TEMPLATE = [
-    {
-        tab: 'Requirements', title: 'System Requirements',
-        description: 'Make sure everything below is ready before installing. Skipping steps is the #1 reason the driver, overlay, or features fail.',
-        items: [
-            '**Windows 10 or 11** (64-bit)',
-            '**Administrator account** â€” loader must run as Admin',
-            '**Discord desktop app** installed, running, and logged in',
-            '**Fortnite** with Discord in-game overlay enabled',
-            '**Visual C++ Redistributable 2015â€“2022 (x64)**',
-            '**WinRAR** â€” required to extract downloaded files',
-            '**Stable internet** for license authentication'
-        ],
-        info: 'Product: ASX External Â· Executable: loader.exe Â· Config: %ProgramData%\\ASX External\\config.ini',
-        link: { text: 'Download WinRAR', url: 'https://www.win-rar.com/download.html' }
-    },
-    {
-        tab: 'VC++ Redist', title: 'Install Visual C++ Redistributable',
-        description: 'The loader needs the 2015â€“2022 x64 runtime. Install it and reboot before continuing.',
-        items: [
-            'Download the **x64** version from the official Microsoft link',
-            'Run the installer and accept the prompts',
-            'If it says already installed, choose **Repair**',
-            '**Restart your PC** after it finishes'
-        ],
-        link: { text: 'Download VC++ Redist (x64)', url: 'https://aka.ms/vs/17/release/vc_redist.x64.exe' }
-    },
-    {
-        tab: 'Disable Antivirus', title: 'Disable Antivirus / Defender',
-        description: 'Antivirus will flag and delete the loader. Add an exclusion or turn real-time protection off before extracting.',
-        items: [
-            'Open **Windows Security â†’ Virus & threat protection**',
-            'Turn off **Real-time protection**',
-            'Add an **exclusion** for the folder you extract the loader to',
-            'Disable any third-party AV (Avast, McAfee, etc.) too'
-        ],
-        info: 'If the loader vanishes after download, your AV deleted it â€” restore it from quarantine and add the exclusion.'
-    },
-    {
-        tab: 'Driver Blocklist', title: 'Disable Vulnerable Driver Blocklist',
-        description: 'Windows blocks the driver the loader uses. Turn the Microsoft Vulnerable Driver Blocklist off.',
-        items: [
-            'Open **Windows Security â†’ Device security â†’ Core isolation**',
-            'Search **"Core isolation"** in the Start menu if you canâ€™t find it',
-            'Turn off the **Microsoft Vulnerable Driver Blocklist**',
-            '**Reboot** to apply'
-        ]
-    },
-    {
-        tab: 'Core Isolation', title: 'Turn Off Memory Integrity',
-        description: 'Memory Integrity (Core Isolation) must be off or the driver will fail to load.',
-        items: [
-            'Open **Windows Security â†’ Device security â†’ Core isolation details**',
-            'Turn **Memory integrity** off',
-            '**Restart your PC** when prompted'
-        ],
-        info: 'Still failing after this? Disable Secure Boot in BIOS as a last resort.'
-    },
-    {
-        tab: 'Discord Overlay', title: 'Enable Discord In-Game Overlay',
-        description: 'The menu renders through the Discord overlay, so it has to be enabled for Fortnite.',
-        items: [
-            'Open **Discord â†’ Settings â†’ Game Overlay** and enable it',
-            'Go to **Registered Games**, add **Fortnite** if itâ€™s missing',
-            'Make sure the **overlay toggle** for Fortnite is on',
-            'Keep Discord running while you play'
-        ],
-        link: { text: 'Open Discord', url: 'https://discord.com/app' }
-    }
-];
 
 // Helpers
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
